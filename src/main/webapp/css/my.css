@@ -1,0 +1,40 @@
+
+table, th, td {
+    border: 1px solid black;
+}
+
+#players td img {
+    display: inline-block;
+    margin: 0 auto;
+}
+
+.pagination {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+}
+
+.pagination a {
+    text-decoration: none;
+    color: #333;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    transition: background 0.3s;
+}
+
+.pagination a.active {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.pagination a:hover:not(.active) {
+    background-color: #f0f0f0;
+}
+
+.pagination-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}

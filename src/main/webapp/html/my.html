@@ -3,9 +3,419 @@
     <title>RPG</title>
     <script src=https://code.jquery.com/jquery-3.6.0.min.js></script>
     <link href="/css/my.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 </head>
 <body>
 <h1>RPG admin panel</h1>
+<h2>Accounts list</h2>
 
+<br>
+<label for="items">Count per page:</label>
+<select name="items" id="items">
+    <option value="3">3</option>
+    <option value="5">5</option>
+    <option value="10">10</option>
+    <option value="20">20</option>
+</select>
+<br>
+<table id="players">
+    <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Title</th>
+        <th>Race</th>
+        <th>Profession</th>
+        <th>Level</th>
+        <th>Birthday</th>
+        <th>Banned</th>
+        <th>Edit</th>
+        <th>Delete</th>
+    </tr>
+</table>
+
+<div class="pagination-wrapper">
+    <label for="pagination">Pages:</label>
+    <nav class="pagination" id="pagination"></nav>
+</div>
+<hr>
+
+<form id="createPlayerForm">
+    <label>Name:
+        <input type="text" id="name" required style="width: 30%">
+    </label><br><br>
+
+    <label>Title:
+        <input type="text" id="title" required style="width: 30%">
+    </label><br><br>
+
+    <label>Race:
+        <select id="race" required style="width: 30%">
+        </select>
+    </label><br><br>
+
+    <label>Profession:
+        <select id="profession" required style="width: 30%">
+        </select>
+    </label><br><br>
+
+    <label>Level (0&ndash;100):
+        <input type="number" id="level" min="0" max="100" required style="width: 30%">
+    </label><br><br>
+
+    <label>Birthday:
+        <input
+                type="text"
+                id="birthday"
+                placeholder="01.01.2000"
+                pattern="(0[1-9]|[12][0-9]|3[01])\.(0[1-9]|1[0-2])\.\d{4}"
+                title="Формат: dd.MM.yyyy"
+                required
+                style="width: 30%">
+    </label><br><br>
+
+    <label>Banned:
+        <select id="banned" style="width: 30%">
+            <option value="false">No</option>
+            <option value="true">Yes</option>
+        </select>
+    </label><br><br>
+
+    <button type="submit">Create Player</button>
+</form>
+
+<script>
+    async function loadPlayers() {
+        try {
+            const getCountAllUsers = async () => {
+                const response = await fetch('/rest/players/count', {
+                    method: 'GET', // Чаще всего данные получают через GET
+                    headers: {'Content-Type': 'application/json'}
+                });
+
+                if (!response.ok) throw new Error(`Ошибка Http: ${response.status}`);
+
+                const count = await response.json();
+                console.log("result count = ", count);
+                return count;
+            }
+
+            const divideByNumber = (countAllTableElements, divider) => {
+                return countAllTableElements / divider;
+            };
+
+            const getRemainder = (number, divisor) => number % divisor;
+
+            const countTableElements = document.getElementById('items').value;
+            let countAllTableElements = await getCountAllUsers();
+
+            let resultPage = Math.floor(divideByNumber(countAllTableElements, countTableElements));
+
+            if (getRemainder(countAllTableElements, countTableElements) > 0) resultPage++;
+            if (resultPage == 0) resultPage = 1;
+            console.log("countAllTableElements =  countTableElements =  ", countAllTableElements, countTableElements);
+            const paginationNav = document.querySelector('nav.pagination');
+            paginationNav.innerHTML = "";
+
+            for (let i = 0; i < resultPage; i++) {
+                if (i === 0) {
+                    paginationNav.innerHTML += `<a href="#" class='active' >${i + 1}</a>`;
+                } else {
+                    paginationNav.innerHTML += `<a href="#" >${i + 1}</a>`;
+                }
+            }
+            await players(0);
+        } catch (error) {
+            console.error('Ошибка:', error);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadPlayers);
+    document.getElementById('items').addEventListener('change', function () {
+        loadPlayers();
+    });
+    document.getElementById('pagination').addEventListener('click', function (event) {
+        event.preventDefault();
+        const paginationNav = document.getElementById('pagination');
+        paginationNav.querySelectorAll('a').forEach(a => a.classList.remove('active'));
+        const clickedLink = event.target;
+        clickedLink.classList.add('active');
+        const pageNumberFromText = clickedLink.innerText;
+        console.log("Number between tags:", pageNumberFromText);
+        players(pageNumberFromText - 1);
+    });
+</script>
+
+<script>
+    async function players(pNumber) {
+
+        const getUsersOnPage = async (pageNumber, pageSize) => {
+            const response = await fetch(`/rest/players?pageNumber=${pageNumber}&pageSize=${pageSize}`, {
+                method: 'GET', // Чаще всего данные получают через GET
+                headers: {'Content-Type': 'application/json'}
+            });
+
+
+            if (!response.ok) throw new Error(`Ошибка Http: ${response.status}`);
+            return await response.json();
+        }
+
+        const table = document.getElementById('players');
+
+        while (table.rows.length > 1) {
+            table.deleteRow(1);
+        }
+        console.log("pName=", pNumber)
+        let users = await getUsersOnPage(pNumber, document.getElementById('items').value);
+        console.log('users = ', users)
+        users.forEach((player) => {
+            const row = table.insertRow();
+            row.id = `player-row-${player.id}`;
+            row.innerHTML = `
+                <td name="player-id">${player.id}</td>
+                <td name="player-name">${player.name}</td>
+                <td name="player-title">${player.title}</td>
+                <td name="player-race">${player.race}</td>
+                <td name="player-profession">${player.profession}</td>
+                <td name="player-level">${player.level}</td>
+                <td name="player-birthday">${new Date(player.birthday).toLocaleDateString()}</td>
+                <td name="player-banned">${player.banned}</td>
+                <td><img src="/img/edit.png"  alt="Edit" onclick="editPlayer(this, ${player.id})"
+             style="cursor:pointer"></td>
+                <td><img src="/img/delete.png" alt="Delete" onclick="deletePlayer(${player.id})" )></td>
+            `;
+        });
+
+
+        const raceSelect = document.getElementById('race');
+        const professionSelect = document.getElementById('profession');
+
+        ALL_RACES.forEach(race => {
+            const option = document.createElement('option');
+            option.value = race;
+            option.textContent = race;
+            raceSelect.appendChild(option);
+        });
+
+        ALL_PROFESSIONS.forEach(prof => {
+            const option = document.createElement('option');
+            option.value = prof;
+            option.textContent = prof;
+            professionSelect.appendChild(option);
+        });
+
+    }
+</script>
+
+<script>
+    async function deletePlayer(id) {
+        try {
+            const sendDelete = async (playerId) => {
+
+                const response = await fetch(`/rest/players/${playerId}`, {
+                    method: 'DELETE',
+                    headers: {'Content-Type': 'application/json'}
+                });
+
+                if (!response.ok) throw new Error(`Ошибка Http: ${response.status}`);
+
+            }
+            await sendDelete(id);
+            console.log(`Игрок ${id} удален`);
+            const paginationNav = document.querySelector('nav.pagination');
+            const activeLink = paginationNav.querySelector('a.active');
+            if (activeLink) {
+                const pNumber = activeLink.innerText - 1;
+                players(pNumber)
+            }
+
+
+        } catch (error) {
+            console.log('Error', error)
+        }
+    }
+</script>
+
+<script>
+    const ALL_RACES = ["HOBBIT", "ORC", "DWARF", "HUMAN", "ELF", "GIANT", "TROLL"];
+    const ALL_PROFESSIONS = ["ROGUE", "WARRIOR", "CLERIC", "SORCERER", "PALADIN", "DRUID", "NAZGUL"];
+    const ALL_BANNED = ["true", "false"];
+</script>
+
+<script>
+    async function editPlayer(imgElement, id) {
+        try {
+            imgElement.src = "/img/save.png";
+            imgElement.alt = "Save";
+
+            const row = imgElement.closest('tr');
+
+            const deleteImg = row.querySelector('img[alt="Delete"]');
+            if (deleteImg) {
+                deleteImg.style.visibility = 'hidden';
+            }
+
+            const nameCell = row.querySelector('[name="player-name"]');
+            const currentName = nameCell.innerText;
+            nameCell.innerHTML = `<input type="text" value="${currentName}" style="width: 100%">`;
+
+            const titleCell = row.querySelector('[name="player-title"]');
+            const currentTitle = titleCell.innerText;
+            titleCell.innerHTML = `<input type="text" value="${currentTitle}" style="width: 100%">`;
+
+            const raceCell = row.querySelector('[name="player-race"]');
+            const currentRace = raceCell.innerText.trim();
+
+            let selectHtmlRace = `<select style="width: 100%">`;
+            ALL_RACES.forEach(race => {
+                const isSelected = (race === currentRace) ? "selected" : "";
+                selectHtmlRace += `<option value="${race}" ${isSelected}>${race}</option>`;
+            });
+            selectHtmlRace += `</select>`;
+            raceCell.innerHTML = selectHtmlRace;
+
+            const professionCell = row.querySelector('[name="player-profession"]');
+            const currentProfession = professionCell.innerText.trim();
+
+            professionCell.innerHTML = `<input type="text" value="${currentProfession}" style="width: 100%">`;
+            let selectHtmlProfession = `<select style="width: 30%">`;
+            ALL_PROFESSIONS.forEach(prof => {
+                const isSelected = (prof === currentProfession) ? "selected" : "";
+                selectHtmlProfession += `<option value="${prof}" ${isSelected}>${prof}</option>`;
+            });
+            selectHtmlProfession += `</select>`;
+            professionCell.innerHTML = selectHtmlProfession;
+
+            const bannedCell = row.querySelector('[name="player-banned"]');
+            const currentBanned = raceCell.innerText.trim();
+
+            let selectHtmlBanned = `<select style="width: 100%">`;
+            ALL_BANNED.forEach(banned => {
+                const isSelected = (banned === currentBanned) ? "selected" : "";
+                selectHtmlBanned += `<option value="${banned}" ${isSelected}>${banned}</option>`;
+            });
+            selectHtmlBanned += `</select>`;
+            bannedCell.innerHTML = selectHtmlBanned;
+
+
+            imgElement.onclick = async function () {
+                try {
+                    const playerInfo = {
+                        id: id,
+                        name: row.querySelector('[name="player-name"] input').value,
+                        title: row.querySelector('[name="player-title"] input').value,
+                        race: row.querySelector('[name="player-race"] select').value,
+                        profession: row.querySelector('[name="player-profession"] select').value,
+                        banned: row.querySelector('[name="player-banned"] select').value === "true",
+                        birthday: new Date(row.querySelector('[name="player-birthday"]').innerText).getTime(),
+                        level: row.querySelector('[name="player-level"]').textContent
+                    };
+                    console.log("playerInfo: ", playerInfo)
+                    await updatePlayer(playerInfo);
+
+                } catch (error) {
+                    alert("ошибка при обновлении игрока");
+                    console.error(error);
+                }
+            }
+        } catch (error) {
+            console.log('Error', error)
+        }
+    }
+</script>
+
+<script>
+    async function updatePlayer(playerInfo) {
+        try {
+            const sendUpdate = async (playerId, playerBody) => {
+
+                const response = await fetch(`/rest/players/${playerId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(playerBody)
+                });
+                if (!response.ok) throw new Error(`Ошибка Http: ${response.status}`);
+            }
+            await sendUpdate(playerInfo.id, playerInfo);
+            console.log(`Игрок ${playerInfo.id} обновлен`);
+            const paginationNav = document.querySelector('nav.pagination');
+            const activeLink = paginationNav.querySelector('a.active');
+            if (activeLink) {
+                const pNumber = activeLink.innerText - 1;
+                players(pNumber)
+            }
+        } catch (error) {
+            console.log('Error', error)
+        }
+    }
+</script>
+<script>
+    flatpickr("#birthday", {
+        dateFormat: "d.m.Y",
+        altInput: false,
+        allowInput: true,
+        locale: "default",
+        minDate: "01.01.2000",
+        maxDate: "31.12.3000",
+        onChange: function (selectedDates, dateStr, instance) {
+            if (selectedDates.length > 0) {
+                const  timestamp = selectedDates[0].getTime();
+                console.log("selectedDates:", dateStr, "timestamp: ", timestamp);
+            }
+        }
+    });
+</script>
+
+<script>
+    document.getElementById('createPlayerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const fp = document.querySelector("#birthday")._flatpickr;
+        const birthdayLong = fp && fp.selectedDates.length > 0
+            ? fp.selectedDates[0].getTime()
+            : null;
+
+        if (!birthdayLong) {
+            alert("Выберите корректную дату!");
+            return;
+        }
+
+        const newPlayer = {
+            name: document.getElementById('name').value.trim(),
+            title: document.getElementById('title').value.trim(),
+            race: document.getElementById('race').value,
+            profession: document.getElementById('profession').value,
+            level: parseInt(document.getElementById('level').value),
+            birthday: birthdayLong,
+            banned: document.getElementById('banned').value === 'true'
+        };
+
+        try {
+            const response = await fetch('/rest/players', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(newPlayer)
+            });
+
+            if (!response.ok) {
+                throw new Error(`Ошибка: ${response.status}`);
+            }
+
+            alert('Player created successfully!');
+            document.getElementById('createPlayerForm').reset();
+
+            const paginationNav = document.querySelector('nav.pagination');
+            const activeLink = paginationNav.querySelector('a.active');
+            const pageNumber = activeLink ? activeLink.textContent - 1 : 0;
+            players(pageNumber);
+
+        } catch (error) {
+            console.error('Error creating player:', error);
+            alert('Failed to create player.');
+        }
+    });
+</script>
 </body>
 </html>
